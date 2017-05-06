@@ -1,0 +1,568 @@
+=========================================
+          Centos 6.5 mini LAMP
+=========================================
+-------------------------------------
+                OS
+-------------------------------------
+网卡配置
+    vi  /etc/sysconfig/network-scripts/ifcfg-eth0
+    修改 ONBOOT=yes
+    service network restart 
+
+
+-------------------------------------
+           LAMP
+-------------------------------------
+[关闭LELINUX]  
+    vi /etc/selinux/config
+    #SELINUX=enforcing #注释掉
+    #SELINUXTYPE=targeted #注释掉
+    SELINUX=disabled #增加
+
+    :wq! #保存退出
+    #记得重启! 
+    shutdown -r 0
+
+    
+[添加第三方yum源] (CentOS默认yum源软件版本太低了，要安装最新版本的LAMP，这里使用第三方yum源)
+    安装 wget 
+        yum install wget
+        
+    使用第三方yum源
+        wget http://www.atomicorp.com/installers/atomic
+        sh ./atomic #安装
+
+        yum clean all #清除当前yum缓存
+        yum makecache #缓存yum源中的软件包信息
+        yum repolist #列出yum源中可用的软件包
+
+[安装上传工具] rz 命令
+    yum install lrzsz
+    
+[Apache]
+    yum install httpd 
+
+    service httpd start # 启动
+    备注：Apache启动之后会提示错误：
+        httpd: Could not reliably determine the server's fully qualif domain name, using ::1 for ServerName
+    解决办法：
+        vi /etc/httpd/conf/httpd.conf #编辑
+        ServerName www.example.com:80 #去掉前面的注释
+        :wq! #保存退出
+    
+    chkconfig httpd on #设为开机启动
+
+    配置防火墙，开启80端口、3306端口
+        vi /etc/sysconfig/iptables
+        -A INPUT -m state --state NEW -m tcp -p tcp --dport 80 -j ACCEPT
+        -A INPUT -m state --state NEW -m tcp -p tcp --dport 3306 -j ACCEPT
+        #注释下面的两行
+        #-A INPUT -j REJECT --reject-with icmp-host-prohibited
+        #-A FORWARD -j REJECT --reject-with icmp-host-prohibited
+
+        :wq! #保存退出
+        service iptables restart # 重启防火墙
+
+[mysql]
+    yum install mysql mysql-server
+    yum install mysql mysql-devel
+
+    chkconfig mysqld on #设为开机启动
+    cp /usr/share/mysql/my-medium.cnf /etc/my.cnf #拷贝配置文件（注意：如果/etc目录下面默认有一个my.cnf，直接覆盖即可）
+
+    
+    mysql_secure_installation   #为root账户设置密码
+    service mysqld restart  #
+
+
+[php]
+    yum install php 
+    yum install php-devel
+    
+    yum install php-mysql php-gd libjpeg* php-imap php-ldap php-odbc php-pear php-xml php-xmlrpc php-mbstring php-mcrypt php-bcmath php-mhash libmcrypt php-pdo php-xdebug php-memcached php-redis
+
+
+[配置]
+    [Apache]
+        vi /etc/httpd/conf/httpd.conf #编辑文件
+        AddHandler cgi-script .cgi　在796行 修改为：AddHandler cgi-script .cgi .pl （允许扩展名为.pl的CGI脚本运行）
+
+        AllowOverride None => AllowOverride All
+        DirectoryIndex index.html index.html.var => DirectoryIndex index.php index.html index.html.var
+        KeepAlive Off  在76行 修改为：KeepAlive On （允许程序性联机）
+
+    [php]
+        vi /etc/php.ini #编辑
+
+        date.timezone = PRC
+        short_open_tag = ON 
+        :wq  # 保存退出
+        service httpd restart # 重启apache
+[vsftpd]
+    # 安装
+    yum -y install vsftpd
+    #配置
+    vi /etc/vsftpd/vsftpd.conf
+    
+    anonymous_enable=No
+    ascii_upload_enable=YES
+    ascii_download_enable=YES
+    chroot_local_user=YES
+    ls_recurse_enable=YES
+    local_root=/var/www/html
+    :wq
+    # 添加用户 及密码
+    useradd ftpuser -s /sbin/nologin
+    passwd ftpuser
+
+    #编辑user_list文件，允许ftpuser用户访问FTP
+    vi /etc/vsftpd/user_list
+    ftpuser
+    :wq # 保存退出
+
+    #开机启动FTP
+    chkconfig vsftpd on
+    # 重启服务
+    service vsftpd restart 
+
+    # 增加ftp 防火墙设置
+    vi /etc/iptables
+    -A RH-Firewall-1-INPUT -m state --state NEW -m tcp -p tcp --dport 21 -j ACCEPT  #FTP21端口的
+    :wq
+    
+    service iptables restart
+    
+    
+    chmod 0777 -R /var/www/html
+    chown ftpuser:ftp /var/www/html
+
+-------------------------------------
+        CoreSeek & Sphinx
+-------------------------------------
+
+tar -xzf coreseek-3.2   .14.tar.gz
+[安装中文分词]
+    cd coreseek-3.2.14/mmseg-3.2.14
+    ./bootstrap
+    ./configure --prefix=/usr/local/mmseg
+
+    # 出现警告也不要担心
+    make 
+    make install
+
+    /usr/local/mmseg/bin/mmseg # 出现下方信息表示成功
+    #Coreseek COS(tm) MM Segment 1.0
+    #Copyright By Coreseek.com All Right Reserved.
+    #Usage: /usr/local/mmseg/bin/mmseg <option> <file>
+    #-u <unidict>           Unigram Dictionary
+    #-r           Combine with -u, used a plain text build Unigram Dictionary, default Off
+    #-b <Synonyms>           Synonyms Dictionary
+    #-t <thesaurus>          Thesaurus Dictionary
+    #-h            print this help and exit
+
+
+    #./configure时报错1：configure: error: C++ compiler cannot create executables
+    安装Gcc
+        yum install gcc gcc++
+        yum install gcc gcc-c++ gcc-g77
+
+    #./configure时报错2：error: cannot find input file: src/Makefile.in
+     yum install libtool*
+
+
+
+
+    [数据库准备]
+        USE test;
+        DROP TABLE post;
+        CREATE TABLE post(
+        	id INT AUTO_INCREMENT PRIMARY KEY,
+        	weight INT DEFAULT 0,
+        	title VARCHAR(255),
+        	content TEXT,
+        	status INT DEFAULT 1
+        )ENGINE=MyISAM DEFAULT CHARSET=UTF8;
+
+
+        insert into post (weight,title,content) values
+        	(0,'儿童动画片儿童影视/动画连续剧  迅雷下载集',''),
+        	(0,'发精彩儿童动画片10部，下载从速',''),
+        	(0,'【儿童节专题】【17部经典动画片下载,附名单】',''),
+        	(0,'<span style="color:red">[图]</span>儿童安全教育动画片《平安》',''),
+        	(0,'十五部国产儿童动画片下载,儿童动画片,儿童动画片...!',''),
+        	(0,'推荐不用注册就能下载数千首儿童歌曲、动画片、游戏、故事等育儿资源',''),
+        	(0,'求儿童动画片',''),
+        	(5,'儿童歌曲、儿童故事、儿童动画片下载','<img alt="细说php" src="images/xsphp.png">'),
+        	(0,'这是一个<b>测</b>试','<script>alert("你确定要删除吗?")</script>'),
+        	(0,'动画片大全',''),
+        	(0,'最新爱情动作片',''),
+        	(0,'儿童是祖国的花朵',''),
+        	(0,'What\'s your favorite book? Book test ',''),
+        	(0,'儿童动画片--童话合集23部--邹义良',''),
+        	(0,'邹家华,上海人。第十四届中央政治局委员',''),
+        	(0,'邹忌讽齐王纳谏原文|译文_文言文翻译_古诗文网','');
+
+[Sphinx 安装]
+
+
+        	
+    cd coreseek-3.2.14/csft-3.2.14/
+    ./configure --prefix=/usr/local/coreseek  --without-unixodbc --with-mmseg --with-mmseg-includes=/usr/local/mmseg/include/mmseg/ --with-mmseg-libs=/usr/local/mmseg/lib/ --with-mysql
+
+
+[Sphinx 配置]
+    带有中文分词的 sphinx
+    注意 coreseek 的配置文件也是csft.conf 
+    cd /usr/local/coreseek/etc
+    cp sphinx.conf.dist csft.conf
+    vi csft.conf
+#################################################################
+    配置文件中有四种配置
+    source 数据源相关
+    index 索引相关
+    indexer 索引器相关(索引器是用来生成索引的命令)
+    searchd 服务进程相关
+    配置文件的格式有下面这几段
+    source main{ #配置了一个数据源作为主数据源，名称是 main
+    }
+    source delta:main { #增量数据源，继承主数据源，名称是 delta
+    } #继承后，相同的配置，不用再写一次了，只需要把不同的写出来
+    index ind_main{ #配置了一个主数据索引,索引的名称是 ind_main
+    }
+    index delta:index_main{ #增量数据索引，继承主数据索引
+    }
+    index dist1{ #分布式索引(在别的服务器上的索引中检索)
+    }
+    indexer{ #索引器
+    }
+    searchd{ #服务进程
+    }
+#################################################################
+    # 查看mysql 的sock = /var/lib/mysql/mysql.sock 文件目录. 
+    # cat /etc/my.cnf
+
+    [基本配置]
+        主数据源，默认名是 src1，方便管理，改为 main
+        source main
+        {
+        type = mysql #数据库类型
+        sql_host = localhost # MySQL 主机 IP
+        sql_user = root # MySQL 用户名
+        sql_pass = 123 # MySQL 密码
+        sql_db = test # MySQL 数据库
+        sql_port = 3306 # MySQL 端口
+        sql_sock = /tmp/mysql.sock #linux 下需要开启，指定 sock 文件，将#号注释去掉
+        sql_query_pre = SET NAMES UTF8 # MySQL 检索编码(去掉注释)
+        sql_query_pre = SET SESSION query_cache_type=OFF #关闭缓存(去掉注释)
+        sql_query= \ #获取数据的 SQL 语句，反斜线“\”表示接着下一行
+        SELECT id, title, content FROM post
+        #sql_attr_uint = group_id #注释掉(排序字段)
+        #sql_attr_timestamp = date_added #注释掉
+        sql_query_info= SELECT * FROM post WHERE id=$id #这行将表名改正确，id 是数据库中的主键字段
+        }
+        主数据源 main 到这里配置结束了
+        接下来这个是增量数据源配置示例，先注释掉，后面将单独进行配置
+        增量数据源
+        #source src1throttled : src1
+        #{
+        # sql_ranged_throttle = 100
+        #}
+        下面是主数据索引的配置示例，test1 是主数据索引的名字，这里为了方便管理，修改为 ind_main
+        主数据索引
+        index ind_main
+        {
+        source = main
+        #要对哪个数据源进行索引，这里对应上面主数据源的名字，将默认的 src1 改为 main
+        path = /usr/local/coreseek/var/data/ind_main
+        #索引保存在什么地方，data 目录下，最好与索引名字同名
+        #注释掉下面的几行
+        #stopwords = G:\data\stopwords.txt
+        #wordforms = G:\data\wordforms.txt
+        #exceptions = /data/exceptions.txt
+        #charset_type = sbcs
+        #添加下面这两行，意思是把中文分词加入到配置文件中
+        charset_type = zh_cn.utf-8 #字符集类型
+        charset_dictpath = /usr/local/mmseg/etc/ #中文词典目录 就是安装 mmseg 的目录
+        }
+        Sphinx 资料 讲师：邹义良 http://www.weibo.com/it266
+        其它选项不用改，到这里主数据索引配置完成
+        下面是增量数据源索引，由于前面已将增量数据源注释掉了，所以增量数据索引也不需要，注释掉即可
+        增量数据源索引
+        #index test1stemmed : test1
+        #{
+        # path = /usr/local/coreseek/var/data/test1stemmed
+        # morphology = stem_en
+        #}
+        接下来是分布式索引，只有这一台服务器，不需要分布式索引，也注释掉
+        分布式索引
+        #distributed index example
+        #index dist1
+        #{
+        #….
+        #agent_query_timeout = 3000
+        #}
+        将上面这些注释掉后，其实只留下了主数据源和主数据索引
+        接下来是 indexer settings 索引器设置和 searchd settings 进程设置，默认即可
+
+        索引器
+        indexer
+        {
+        #默认即可，不用改
+        }
+        
+        进程设置
+        searchd
+        {
+        #默认即可，不用改
+        }
+        整个配置完成
+        =============================================
+        注意，要确定数据库中的表，一定是 UTF8 字符集
+        在 MySQL 中用：\s 可以查看服务器信息
+    [基本配置 结束]
+
+
+    [进阶配置]
+        实时索引
+        数据库中的数据很大，然后我有些新的数据后来加入到数据库中，也希望能够检索到，全部重新建立索引很消耗资源，这样需要用到“主索引+增量索引”的思路来解决，这个模式实现的基本原理是设置两个数据源和两个索引。
+        1、创建一个计数器        在数据库中增加一个计数表，记录将文档集分为两个部分的文档 ID,每次重新构建主索引时，更这个表
+        先在 mysql 中插入一个计数表
+        CREATE TABLE sph_counter( counter_id INT PRIMARY KEY, max_doc_id INT);
+
+        主数据源，继承数据源，主索引，继承索引。（继承索引也就是增量索引）。
+        [配置]
+            # 主数据源
+            Source main{
+                #添加一个 sql_query_pre 语句
+                sql_query_pre = REPLACE INTO sph_counter SELECT 1, MAX(id) FROM post
+                #修改 sql_query 内容如下
+                sql_query= \
+                SELECT id,title, content FROM post \
+                WHERE id<=(SELECT max_doc_id FROM sph_counter WHERE counter_id=1)
+                # 个人观点 : WHERE id<= (***) 这里可以不用 直接 拿掉就行
+                # 因为主索引要索引全部的数据, 加不加这个条件都一样
+            }
+        
+            # 增量数据源 继承自 main 数据源，只需要重写 main 中的 sql_query_pre 和 sql_query 项，并将默认的 test1stemmed 名字改为 delta 方便管理
+            source delta : main
+            {
+                sql_query_pre = SET NAMES utf8
+                sql_query= \
+                SELECT id,title, content FROM post \
+                WHERE id>(SELECT max_doc_id FROM sph_counter WHERE counter_id=1)
+                # 主数据索引每天重建一次并记录更新的id,增量索引只查询这个id到目前的数据,量较小,速度也会增快, 后面用计划任务没隔n分钟重建一次
+            }
+
+            主索引不变
+            Index ind_main { }
+
+            增量索引，继承了 ind_main 索引，并重写 source 和 path 项
+            index ind_delta:ind_main
+            {
+                source= delta
+                path= /usr/local/coreseek/var/data/ind_delta
+                # distributed index
+            }
+        
+        [注意]
+            如果你增量索引的 source 配置中只有 id,content 两项
+            而主索引的 source 配置中有 id, title,content 三项，合并的时候会报属性数量不匹配，如:
+            Delta:sql_query = SELECT id, title,content FROM post
+            Main:sql_query=SELECT id,title,date,content FROM post
+
+        # 重建主索引 & 增量索引 
+        /usr/local/coreseek/bin/indexer index_post --rotate
+        /usr/local/coreseek/bin/indexer index_post_delta --rotate
+
+
+        [实时更新索引 计划任务]
+            我们需要建立两个脚本，还要用到计划任务
+            建立一个主索引和增量索引的脚本
+            main.sh delta.sh
+            在增量索引中写下 delta.sh
+            vi /usr/local/coreseek/etc/delta.sh
+            #!/bin/bash
+            #delta.sh
+            /usr/local/coreseek/bin/indexer ind_delta --rotate >>/usr/local/coreseek/var/log/delta.log
+            
+            主索引中写下:main.sh
+            vi /usr/local/coreseek/etc/main.sh
+            #!/bin/bash
+            #main.sh
+            /usr/local/coreseek/bin/indexer ind_main --rotate >>/usr/local/coreseek/var/log/main.log
+            脚本权限:
+            chmod a+x /usr/local/coreseek/etc/delta.sh
+            chmod a+x /usr/local/coreseek/etc/main.sh
+
+            # 计划任务   1 分钟和每天2:30运行重建索引任务
+            */1 * * * * /usr/local/coreseek/etc/delta.sh
+            30 2 * * * /usr/local/coreseek/etc/main.sh
+            :wq
+            要验证的话，我们可以查看日志文件/usr/local/coreseek/var/log/delta.log
+
+        [分布式索引 未做试验]
+            分布式是为了改善查询延迟问题和提高多服务器、多 CPU 或多核环境下的吞吐率，对于大量数据（即十亿级的记
+            录数和 TB 级的文本量）上的搜索应用来说是很关键的
+            分布式思想:对数据进行水平分区（HP，Horizontally partition），然后并行处理，
+            当 searchd 收到一个对分布式索引的查询时，它做如下操作
+            1. 连接到远程代理.
+            2. 执行查询.
+            3. 对本地索引进行查询.
+            Sphinx 资料 讲师：邹义良 http://www.weibo.com/it266
+            4. 接收来自远程代理的搜索结果.
+            5. 将所有结果合并，删除重复项.
+            6. 将合并后的结果返回给客户端.
+            index dist
+            {
+                type = distributed
+                local = chunk1
+                agent = localhost:9312:chunk2 本地
+                agent = 192.168.100.2:9312:chunk3 远程
+                agent = 192.168.100.3:9312:chunk4 远程
+            }
+        
+    [进阶配置 结束]
+
+    
+    现在还没有生成索引文件，这个 data 目录是空的
+    ls /usr/local/coreseek/var/data
+
+
+    生成主数据索引
+    cd /usr/local/coreseek/bin
+    ./indexer ind_main
+
+
+    查看索引文件 已有数据文件
+    ls /usr/local/coreseek/var/data
+    ind_main.spa ind_main.sph ind_main.spk ind_main.spp ind_main.spd ind_main.spi ind_main.spm
+
+
+    测试搜索
+    cd /usr/local/coreseek/bin
+    ./search book
+    ./search PHP
+    均成功搜索到内容   
+    
+
+    启动服务
+    netstat -tunpl | grep 9312 #查看端口是否有占用
+    ./searchd #启动服务
+    #当服务启动后，需要从新生成索引时，需要加参数，不然会报错
+        ./index ind_main --rotate
+
+
+
+[Samba]     准备 Samba 方便 Windows 下开发
+    yum install mount
+    mkdir /mnt/cdrom
+    mount /dev/cdrom /mnt/cdrom
+    yum -y install samba
+    service smb start
+    # 新增一个 smb_user 用户
+    useradd smb_user -s /sbin/nologin
+    smbpasswd -a smb_user # 我们使用创建的smb_user用户名
+    # 编辑配置文件 增加下面配置信息
+    vi /etc/samba/smb.conf
+    [www]
+        path = /var/www/html
+        valid users = smb_user #多个用空格分开。如果没配置此项，所有用户都可以访问
+        writable = yes  #写权限
+    :wq # 保存退出
+    service smb restart
+    # 增加对smb用户的权限
+    setfacl -R -m u:smb_user:rwx /var/www/html/ # smb_user 用户拥有此文件夹的权限
+    setfacl -R -m d:u:smb_user:rwx /var/www/html/ # 即便有了新的文件,smb_user依然有权限
+
+
+[PHP 使用Sphinx]
+    在这篇中我们使用 php 程序操作 Sphinx 做个站内搜素
+    Sphinx 集成到 PHP 程序中，有两种方式:
+    1.Sphinx php 模块
+    2.Sphinxapi 类
+    开启sphinx扩展就不要包含sphinxapi类!
+
+    启动进程命令: searchd
+    -c #指定配置文件
+    --stop #是停止服务
+    --pidfile #用来显式指定一个 PID 文件
+    -p #指定端口
+    
+    启用Sphinx 服务
+    /usr/local/coreseek/bin/searchd -c /usr/local/coreseek/etc/csft.conf
+
+    php连接Sphinx
+    [Sphinx php扩展安装]
+        # 下载php扩展
+        wget http://pecl.php.net/get/sphinx-1.1.0.tgz
+        tar -zxvf sphinx-1.1.0.tgz
+
+        cd /lamp/sphinx-1.1.0
+        /usr/bin/phpize 
+        ./configure --with-php-config=/usr/bin/php-config
+        # 提示出错configure: error: Cannot find libsphinxclient headers
+            # 到coreseek 源代码中
+            cd coreseek-3.2.14/csft-3.2.14/api/libsphinxclient/
+            ./configure
+            make && make install
+            #回到上面的扩展安装步骤,重新执行
+        cd /lamp/sphinx-1.1.0
+        /usr/bin/phpize 
+        ./configure --with-php-config=/usr/bin/php-config
+        make && make install
+
+        配置php.ini
+        vi /etc/php.ini
+        extension/usr/lib64/php/modules/sphinx.so
+        # 显示错误提示
+        error_reporting = E_ALL
+        display_errors = On
+        html_errors = On
+
+        #重启apache
+        service httpd restart    
+
+    [php 使用]
+        $sp = new SphinxClient();
+        $sp->setServer('localhost', 9312);
+        $keyworks = 'book';
+        $index = 'index_post';
+        $sp_result = $sp->query($keyworks,index);
+
+        echo '<pre>';
+        var_dump($sp_result);
+
+    [xdebug php 扩展安装]
+        # 找对应PHP的版本
+        wget https://xdebug.org/files/xdebug-2.4.1.tgz
+        tar -zxf xdebug-2.4.1.tgz
+        cd xdebug-2.4.1
+        /usr/bin/phpize 
+        ./configure --with-php-config=/usr/bin/php-config
+        make && make install
+
+        
+
+        vi /etc/php.ini
+        # 最后行 增加
+        zend_extension = "/usr/lib64/php/modules/xdebug.so";
+        [xdebug]
+        xdebug.remote_handler=dbgp
+        xdebug.remote_enable = On
+        xdebug.remote_host = 127.0.0.1
+        xdebug.remote_port = 9000
+        xdebug.show_exception_trace=On ;这个配置项会产生一些不必要的提示。错误信息提示的倒是很全
+
+        ;xdebug.profiler_enable = off;一般不要打开性能监控，会生成很大的缓存文件，几个g到几十g都有
+        ;xdebug.profiler_enable_trigger = off
+        ;xdebug.profiler_output_name = cachegrind.out.%t.%p
+        ;xdebug.profiler_output_dir = "tmp/xdebug"
+        ;xdebug.show_local_vars=0
+        xdebug.var_display_max_children=1024 ; 最多子节点数 
+        xdebug.var_display_max_data=10240 ; 最大字节数 可以大点
+        xdebug.var_display_max_depth=10 ; 最大深度
+
+        :wq 
+        service restart httpd
+
+   
