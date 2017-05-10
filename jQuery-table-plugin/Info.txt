@@ -1,0 +1,23 @@
+jQuery 插件开发
+对象级别
+    (官方给出的模版)
+    // 前面的 ; 可以避免一些不必要的麻烦
+
+        ;(function ($) {
+            $.fn.plugin=function (options) {
+                var defults = {
+                    // 参数属性配置
+                }
+                // 参数合并
+                var options = $.extend(defults,options);
+                this.each(function () {
+                    // todo
+                })
+            }
+        })(jQeury)
+Notice
+    尽量使用 bind 绑定
+    var _this = $(this)   缓存下this
+    尽可能的使用options.attr 来做操作,避免硬编码
+
+    返回对象方便其他链式操作, return this
