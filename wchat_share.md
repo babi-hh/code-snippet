@@ -1,3 +1,4 @@
+```html
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
     <head>
         <title>微信分享代码</title>
@@ -36,3 +37,4 @@
         </script>
     </body>
 </html>
+```
