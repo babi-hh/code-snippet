@@ -23,6 +23,7 @@ Android 客户端安装包 `client/shadowsocks--universal-4.6.1.apk`, 下载地�
 * Chrome 浏览器插件配置
     * 插件文件`Chrome Plugin/ProxyWwitchYomegav2316.zip`
     
-### BBR安装
+### BBR加速 安装 ()
+
 ---
 * 参见 BBR/Readme.md
