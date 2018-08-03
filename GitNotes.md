@@ -3,6 +3,10 @@
     
     git remote rm origin *
     git remote add origin *     
+    
+设置默认pull/push的分支
+    git branch --set-upstream-to=origin/master
+
 撤销add的文件
 
     git rm --cached <added_file>
