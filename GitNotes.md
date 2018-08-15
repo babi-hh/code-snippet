@@ -1,4 +1,13 @@
 ## Git 常用操作
+
+初始化操作
+
+    git config --global user.name "Seldoon"
+    git config --global user.email seldoon@example.com
+    
+    ssh-keygen -t rsa -C "seldoon@example.com"
+    cat ~/.ssh/id_rsa.pub
+    
 仓库地址变更
     
     git remote rm origin *
