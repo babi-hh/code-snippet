@@ -8,6 +8,17 @@
     ssh-keygen -t rsa -C "seldoon@example.com"
     cat ~/.ssh/id_rsa.pub
     
+初始化本地仓库并推送
+
+    mkdir git-project
+    cd git-project
+    touch .gitignore
+    git init
+    git add .
+    git commit -m "Initial commit"
+    git remote add origin youruser@yourserver.com:/path/to/my_project.git
+    git push origin master
+
 仓库地址变更
     
     git remote rm origin *
